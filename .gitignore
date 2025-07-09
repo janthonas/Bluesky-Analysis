@@ -1,0 +1,23 @@
+# Ignore CSV and JSON data files
+*.csv
+*.json
+
+# Ignore Python bytecode and caches
+__pycache__/
+*.py[cod]
+
+# Ignore environment and dependency files
+.env
+.venv/
+*.egg-info/
+
+# Ignore Conda environments
+*.conda
+*.ipynb_checkpoints/
+
+# Ignore VSCode settings
+.vscode/
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
