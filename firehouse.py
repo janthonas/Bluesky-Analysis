@@ -37,7 +37,7 @@ def on_message_handler(message):
     
     if len(bsky_posts['posts']) >= 10000:
         post_df = pd.DataFrame(bsky_posts)
-        post_df.to_csv('master.csv', mode='a', index=False)
+        post_df.to_csv('output/master.csv', mode='a', index=False)
         
         for key in list(bsky_posts.keys()):
             bsky_posts[key].clear()

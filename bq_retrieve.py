@@ -19,4 +19,4 @@ query_job = client.query(query)
 df = query_job.to_dataframe()
 
 # Display or work with the DataFrame
-df.to_csv('current.csv', index=False)
+df.to_csv('output/current.csv', index=False)

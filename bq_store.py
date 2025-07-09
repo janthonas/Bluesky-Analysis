@@ -19,10 +19,10 @@ from datetime import datetime, timezone
 
 from google.cloud import bigquery
 
-master = pd.read_csv('master.csv')
+master = pd.read_csv('output/master.csv')
 
 try:
-    os.remove("master.csv")
+    os.remove("output/master.csv")
 except FileNotFoundError:
     print('File does not exist')
 
@@ -168,21 +168,21 @@ posts = compress_post_column(posts, column='posts')
 posts['master_post_id'] = posts['did'] + '-' + posts['post_id']
 posts['timestamp'] = pd.to_datetime(posts['timestamp'], unit='s').dt.round('us')
 posts = posts.drop(columns=['did', 'post_id'])
-posts.to_csv('posts.csv', index=False)
+posts.to_csv('output/posts.csv', index=False)
 print('Complete!')
 
 # Build metadata store
 print('----- metadata store -----')
 meta = extract_all_items(master)
 meta = count_items(meta, master)
-meta.to_csv('meta.csv', index=False)
+meta.to_csv('output/meta.csv', index=False)
 print('Complete!')
 
 # Build Network Store
 print('----- network store -----')
 network = master[['did', 'reply_to_did']]
 network = count_did_pairs(network)
-network.to_csv('network.csv', index=False)
+network.to_csv('output/network.csv', index=False)
 print('Complete!')
 
 # Initialize client (make sure GOOGLE_APPLICATION_CREDENTIALS is set)
@@ -260,4 +260,4 @@ print('Complete!')
 #meta['master_post_id'] = meta['did'] + '-' + meta['post_id']
 #print('created master post in metadata!')
 #meta = meta[['master_post_id', 'timestamp', 'facets', 'labels', 'did', 'post_id', 'reply_to_did', 'reply_to_post_id']]
-#meta.to_csv('meta.csv', index=False)
+#meta.to_csv('output/meta.csv', index=False)
