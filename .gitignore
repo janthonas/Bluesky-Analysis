@@ -21,3 +21,11 @@ __pycache__/
 # Ignore OS-specific files
 .DS_Store
 Thumbs.db
+
+# Ignore the output folder
+/output/
+
+# Ignore log files
+*.log
+*.err
+*.out

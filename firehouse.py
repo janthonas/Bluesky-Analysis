@@ -49,65 +49,77 @@ def on_message_handler(message):
 
     car = CAR.from_bytes(commit.blocks)
     for op in commit.ops:
-        if op.action == "create" and op.cid:
-            data = car.blocks.get(op.cid)
+        try:
+       	    if op.action == "create" and op.cid:
+                data = car.blocks.get(op.cid)
 
-            if data and data.get('$type') == 'app.bsky.feed.post':
-                text = data.get('text', '')
+                if data and data.get('$type') == 'app.bsky.feed.post':
+                    text = data.get('text', '')
 
-                try:
-                    langs = data.get('langs', '')[0]
-                except:
-                    langs = 'xx'
+                    try:
+                        langs = data.get('langs', '')[0]
+                    except:
+                        langs = 'xx'
 
-                facets = bool(data.get('facets', ''))
-                reply = bool(data.get('reply', ''))
+                    facets = bool(data.get('facets', ''))
+                    reply = bool(data.get('reply', ''))
 
-                try:
-                    labels = data.get('labels', '')['values'][0]['val']
-                except:
-                    labels = 'none'
+                    try:
+                        labels = data.get('labels', '')['values'][0]['val']
+                    except:
+                        labels = 'none'
 
-                # Post author and ID
-                post_did = commit.repo.replace('did:plc:', '')
-                post_id = op.path.split('/')[-1]
+                    # Post author and ID
+                    post_did = commit.repo.replace('did:plc:', '')
+                    post_id = op.path.split('/')[-1]
 
-                # Default values for reply target
-                reply_to_did = 'none'
-                reply_to_post_id = 'none'
+                    # Default values for reply target
+                    reply_to_did = 'none'
+                    reply_to_post_id = 'none'
 
-                try:
-                    reply_uri = data['reply']['parent']['uri']
-                    reply_to_did = reply_uri.split('/')[2].replace('did:plc:', '')
-                    reply_to_post_id = reply_uri.split('/')[-1]
-                except:
-                    pass
+                    try:
+                        reply_uri = data['reply']['parent']['uri']
+                        reply_to_did = reply_uri.split('/')[2].replace('did:plc:', '')
+                        reply_to_post_id = reply_uri.split('/')[-1]
+                    except:
+                        pass
 
-                createdAt = time.time()
+                    createdAt = time.time()
 
-                bsky_posts['posts'].append(text)
-                bsky_posts['timestamp'].append(createdAt)
-                bsky_posts['langs'].append(langs)
-                bsky_posts['facets'].append(facets)
-                bsky_posts['reply'].append(reply)
-                bsky_posts['labels'].append(labels)
-                bsky_posts['did'].append(post_did)
-                bsky_posts['post_id'].append(post_id)
-                bsky_posts['reply_to_did'].append(reply_to_did)
-                bsky_posts['reply_to_post_id'].append(reply_to_post_id)
+                    bsky_posts['posts'].append(text)
+                    bsky_posts['timestamp'].append(createdAt)
+                    bsky_posts['langs'].append(langs)
+                    bsky_posts['facets'].append(facets)
+                    bsky_posts['reply'].append(reply)
+                    bsky_posts['labels'].append(labels)
+                    bsky_posts['did'].append(post_did)
+                    bsky_posts['post_id'].append(post_id)
+                    bsky_posts['reply_to_did'].append(reply_to_did)
+                    bsky_posts['reply_to_post_id'].append(reply_to_post_id)
 
-                
-                print(text)
-                print(createdAt)
-                print("-------------------------------")
+                    print(text)
+                    print(createdAt)
+                    print("-------------------------------")
+
+        except Exception as e:
+            print("Skipped op due to error")
+            continue
 
 # 🔌 Start client
 # Allows the client to stop while saving the state using a keyboard interrupt
 client = FirehoseSubscribeReposClient()
-try:
-    client.start(on_message_handler)
-except KeyboardInterrupt:
-    pass
+
+while True:
+    try:
+        print("Starting Bluesky Firehouse")
+        client.start(on_message_handler)
+    except KeyboardInterrupt:
+        print("Stopping...")
+        break
+    except Exception as e:
+        print(f"Firehouse stalled: {e}")
+        print("Reconnecting after 5 seconds")
+        time.sleep(5)
 
 print("Process has ended!")
 
