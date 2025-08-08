@@ -29,10 +29,10 @@ load_dotenv()
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "bigquery-key.json"
 
-master = pd.read_csv(os.getenv("MASTER_LOCAL_DIR"))
+master = pd.read_csv(os.getenv("MASTER_VPS_DIR"))
 
 try:
-    #os.remove("master = pd.read_csv(os.getenv("MASTER_LOCAL_DIR"))")
+    os.remove(os.getenv("MASTER_VPS_DIR"))
     print("master.csv file deleted")
 except FileNotFoundError:
     print('File does not exist')
@@ -181,21 +181,21 @@ posts = post_csv_build(posts)
 posts = posts[posts['posts'].str.strip() != '']
 posts = posts.dropna(subset=['posts'])
 posts['week_start'] = posts['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
-posts.to_csv(os.getenv('POSTS_LOCAL_DIR'), index=False)
+posts.to_csv(os.getenv('POSTS_VPS_DIR'), index=False)
 print('Complete!')
 
 # Build metadata store
 print('----- metadata store -----')
 meta = meta_csv_build(master, df_master_total=master)
 meta['week_start'] = meta['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
-meta.to_csv(os.getenv('META_LOCAL_DIR'), index=False)
+meta.to_csv(os.getenv('META_VPS_DIR'), index=False)
 print('Complete!')
 
 # Build Network Store
 print('----- network store -----')
 network = network_csv_build(master[['did', 'reply_to_did']])
 network['week_start'] = network['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
-network.to_csv(os.getenv('NETWORK_LOCAL_DIR'), index=False)
+network.to_csv(os.getenv('NETWORK_VPS_DIR'), index=False)
 print('Complete!')
 
 
