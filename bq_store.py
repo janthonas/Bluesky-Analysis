@@ -18,12 +18,16 @@ from datetime import datetime, timezone
 
 from google.cloud import bigquery
 
-import os
+
 from dotenv import load_dotenv
 
 import numpy as np
 
+from bq_scripts import posts_table, network_temp_table, meta_temp_table, network_merge_query, meta_merge_query
+
 load_dotenv()
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "bigquery-key.json"
 
 master = pd.read_csv(os.getenv("MASTER_LOCAL_DIR"))
 
@@ -92,13 +96,9 @@ def post_csv_build(df):
         
     def format_timestamp(df):
         return pd.to_datetime(df['timestamp'].astype(float), unit='s').dt.round('us')
-        
-    def add_weekstart(df):
-        return df['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
     
     df['master_post_id'] = add_master_post_id(df)
     df['timestamp'] = format_timestamp(df)
-    df['week_start'] = add_weekstart(df)
     df = df.drop(columns=['did', 'post_id'])
         
     return df
@@ -148,7 +148,6 @@ def meta_csv_build(df, df_master_total=None):
     df = df.copy()
     df['items'] = df['posts'].apply(extract_items)
     df = count_items(df, df_master_total)
-
     return df
 
 def network_csv_build(df):
@@ -165,7 +164,6 @@ def network_csv_build(df):
     # Add timestamps
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     counted_df['timestamp'] = today
-    counted_df['week_start'] = counted_df['timestamp'].dt.to_period('W-SUN').dt.start_time.dt.date
 
     return counted_df
 
@@ -180,75 +178,38 @@ print('----- posts store -----')
 posts = master[['timestamp', 'posts', 'did', 'post_id']]
 posts['posts'] = posts['posts'].apply(posts_text_build)
 posts = post_csv_build(posts)
+posts = posts[posts['posts'].str.strip() != '']
+posts = posts.dropna(subset=['posts'])
+posts['week_start'] = posts['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
 posts.to_csv(os.getenv('POSTS_LOCAL_DIR'), index=False)
 print('Complete!')
 
 # Build metadata store
 print('----- metadata store -----')
 meta = meta_csv_build(master, df_master_total=master)
+meta['week_start'] = meta['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
 meta.to_csv(os.getenv('META_LOCAL_DIR'), index=False)
 print('Complete!')
 
 # Build Network Store
 print('----- network store -----')
 network = network_csv_build(master[['did', 'reply_to_did']])
+network['week_start'] = network['timestamp'].dt.to_period('W-SUN').apply(lambda r: r.start_time)
 network.to_csv(os.getenv('NETWORK_LOCAL_DIR'), index=False)
 print('Complete!')
 
-# Initialize client (make sure GOOGLE_APPLICATION_CREDENTIALS is set)
-#client = bigquery.Client()
 
-# Define table references
-project_id = "bsky-store"
-dataset_id = "bsky_data"
-
-posts_table = f"{project_id}.{dataset_id}.posts"
-
-network_table = f"{project_id}.{dataset_id}.network"
-network_temp_table = f"{project_id}.{dataset_id}.network_temp"
-
-# 1. Upload the new meta DataFrame to a temporary table
-job_config = bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
-#client.load_table_from_dataframe(network, network_temp_table, job_config=job_config).result()
-
-# 2. Run a MERGE to upsert into the Network table
-network_merge_query = f"""
-MERGE `{network_table}` AS target
-USING `{network_temp_table}` AS source
-ON target.timestamp = source.timestamp
-   AND target.did = source.did
-   AND target.reply_to_did = source.reply_to_did
-WHEN MATCHED THEN
-  UPDATE SET target.count = target.count + source.count
-WHEN NOT MATCHED THEN
-  INSERT (did, reply_to_did, count, timestamp, week_start)
-  VALUES (source.did, source.reply_to_did, source.count, source.timestamp, source.week_start)
-"""
-
-meta_table = f"{project_id}.{dataset_id}.meta"
-meta_temp_table = f"{project_id}.{dataset_id}.meta_temp"
-
-# 1. Upload the new meta DataFrame to a temporary table
-#client.load_table_from_dataframe(meta, meta_temp_table, job_config=job_config).result()
-
-# 2. Run a MERGE to upsert into the main Meta table
-meta_merge_query = f"""
-MERGE `{meta_table}` AS target
-USING `{meta_temp_table}` AS source
-ON target.timestamp = source.timestamp AND target.item = source.item
-WHEN MATCHED THEN
-  UPDATE SET target.count = target.count + source.count
-WHEN NOT MATCHED THEN
-  INSERT (item, count, timestamp, week_start)
-  VALUES (source.item, source.count, source.timestamp, source.week_start)
-"""
+client = bigquery.Client()
+job_config = bigquery.LoadJobConfig(schema=[bigquery.SchemaField("week_start", "DATE")], write_disposition="WRITE_TRUNCATE")
+client.load_table_from_dataframe(network, network_temp_table, job_config=job_config).result()
+client.load_table_from_dataframe(meta, meta_temp_table, job_config=job_config).result()
 
 # Example: write pandas DataFrame to Posts table
 print('----- Uploading to BQ! -----')
-#client.load_table_from_dataframe(posts, posts_table).result()
-#client.query(network_merge_query).result()
-#client.delete_table(network_temp_table, not_found_ok=True)
-#client.query(meta_merge_query).result()
-#client.delete_table(meta_temp_table, not_found_ok=True)
+client.load_table_from_dataframe(posts, posts_table).result()
+client.query(network_merge_query).result()
+client.delete_table(network_temp_table, not_found_ok=True)
+client.query(meta_merge_query).result()
+client.delete_table(meta_temp_table, not_found_ok=True)
 print('Complete!')
 
